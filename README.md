@@ -2,6 +2,66 @@
 
 Terraform module to provision an AWS DynamoDB table with full-featured support for global tables, DAX caching, auto-scaling, encryption, streaming, and more.
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+    subgraph App["Application Layer"]
+        CLIENT["Application"]
+    end
+
+    subgraph Cache["DAX Caching"]
+        DAX["DAX Cluster\n(In-Memory Cache)"]
+    end
+
+    subgraph Table["DynamoDB Table"]
+        MAIN["Table\n(Hash/Range Keys)"]
+        GSI["Global Secondary\nIndexes"]
+        LSI["Local Secondary\nIndexes"]
+        TTL["TTL\nConfiguration"]
+    end
+
+    subgraph Security["Encryption & Recovery"]
+        KMS["KMS Encryption\n(At Rest)"]
+        PITR["Point-in-Time\nRecovery"]
+    end
+
+    subgraph Streaming["Change Data Capture"]
+        DDB_STREAM["DynamoDB\nStreams"]
+        KINESIS["Kinesis Data\nStreams"]
+    end
+
+    subgraph Replication["Global Tables"]
+        REPLICA["Multi-Region\nReplicas"]
+    end
+
+    subgraph Scaling["Auto Scaling"]
+        AUTOSCALE["Read/Write\nCapacity Scaling"]
+        CW["CloudWatch\nContributor Insights"]
+    end
+
+    CLIENT --> DAX
+    DAX --> MAIN
+    MAIN --> GSI
+    MAIN --> LSI
+    MAIN --> TTL
+    MAIN --> KMS
+    MAIN --> PITR
+    MAIN --> DDB_STREAM
+    MAIN --> KINESIS
+    MAIN --> REPLICA
+    AUTOSCALE --> MAIN
+    CW --> MAIN
+
+    style App fill:#FF9900,color:#fff
+    style Cache fill:#0078D4,color:#fff
+    style Table fill:#3F8624,color:#fff
+    style Security fill:#DD344C,color:#fff
+    style Streaming fill:#8C4FFF,color:#fff
+    style Replication fill:#0078D4,color:#fff
+    style Scaling fill:#FF9900,color:#fff
+```
+
 ## Architecture
 
 ```

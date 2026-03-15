@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>terraform-aws-dynamodb | Architecture Document</title>
+<style>
+  :root {
+    --ink: #0b0c0b;
+    --accent: #c8420a;
+    --text: #d4d4d4;
+    --text-muted: #888;
+    --surface: #141514;
+    --surface-alt: #1a1b1a;
+    --border: #2a2b2a;
+    --success: #2ea043;
+    --warning: #d29922;
+    --info: #388bfd;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    background: var(--ink);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  h1, h2, h3 { color: #fff; font-weight: 600; }
+  h1 { font-size: 2rem; margin-bottom: 0.5rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.75rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+
+  .subtitle { color: var(--accent); font-size: 0.95rem; margin-bottom: 2rem; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .card .metric {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .card .label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+
+  .exec-summary {
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    padding: 1.5rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1.5rem 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+
+  th {
+    background: var(--surface);
+    color: var(--accent);
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid var(--accent);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tr:hover td { background: var(--surface-alt); }
+
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+  }
+
+  .flow-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    min-width: 800px;
+  }
+
+  .flow-row {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .flow-box {
+    background: var(--surface-alt);
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #fff;
+    min-width: 140px;
+  }
+
+  .flow-box.primary {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .flow-box.secondary {
+    border-color: var(--info);
+    background: rgba(56, 139, 253, 0.1);
+  }
+
+  .flow-box.tertiary {
+    border-color: var(--success);
+    background: rgba(46, 160, 67, 0.1);
+  }
+
+  .flow-arrow {
+    color: var(--accent);
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .checklist {
+    list-style: none;
+    padding: 0;
+  }
+
+  .checklist li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .checklist li::before {
+    content: '';
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--success);
+    border-radius: 3px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.15rem;
+  }
+
+  .tag-healthcare { background: rgba(56, 139, 253, 0.15); color: var(--info); border: 1px solid var(--info); }
+  .tag-finance { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+  .tag-government { background: rgba(200, 66, 10, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+  .tag-retail { background: rgba(46, 160, 67, 0.15); color: var(--success); border: 1px solid var(--success); }
+  .tag-saas { background: rgba(163, 113, 247, 0.15); color: #a371f7; border: 1px solid #a371f7; }
+
+  .industry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  .industry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+
+  .industry-card h4 { margin-bottom: 0.5rem; color: #fff; }
+  .industry-card p { font-size: 0.85rem; color: var(--text-muted); }
+
+  code {
+    background: var(--surface);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--accent);
+  }
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin: 1rem 0;
+  }
+
+  .links-section a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .links-section a:hover { border-bottom-color: var(--accent); }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .data-flow-step {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .step-num {
+    background: var(--accent);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .security-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .security-item h4 { color: var(--accent); font-size: 0.95rem; margin-bottom: 0.35rem; }
+  .security-item p { font-size: 0.85rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<h1>terraform-aws-dynamodb</h1>
+<div class="subtitle">Architecture Document &mdash; Full-Featured AWS DynamoDB Table Module</div>
+
+<!-- Executive Summary -->
+<h2>Executive Summary</h2>
+<div class="exec-summary">
+  <p>Terraform module to provision an AWS DynamoDB table with full-featured support for global tables (multi-region replication), DAX in-memory caching, auto-scaling with target tracking policies, server-side encryption (AWS or customer-managed KMS), DynamoDB Streams, Kinesis streaming, TTL, Contributor Insights, and configurable secondary indexes (GSI/LSI). Supports both PAY_PER_REQUEST and PROVISIONED billing modes.</p>
+</div>
+
+<!-- Overview Cards -->
+<h2>Overview</h2>
+<div class="card-grid">
+  <div class="card">
+    <div class="metric">12</div>
+    <div class="label">Resources</div>
+  </div>
+  <div class="card">
+    <div class="metric">28</div>
+    <div class="label">Variables</div>
+  </div>
+  <div class="card">
+    <div class="metric">14</div>
+    <div class="label">Outputs</div>
+  </div>
+  <div class="card">
+    <div class="metric">3</div>
+    <div class="label">Data Sources</div>
+  </div>
+</div>
+
+<!-- Architecture Diagram -->
+<h2>Architecture Diagram</h2>
+<div class="arch-diagram">
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-box secondary">Application Layer</div>
+    </div>
+    <div class="flow-arrow">|</div>
+    <div class="flow-row">
+      <div class="flow-box tertiary">DAX Cluster<br><small>In-memory cache</small></div>
+    </div>
+    <div class="flow-arrow">|</div>
+    <div class="flow-row">
+      <div class="flow-box primary">DynamoDB Table<br><small>Hash/Range Keys</small></div>
+    </div>
+    <div class="flow-arrow">|</div>
+    <div class="flow-row">
+      <div class="flow-box">GSI<br><small>Global Secondary</small></div>
+      <div class="flow-box">LSI<br><small>Local Secondary</small></div>
+      <div class="flow-box">TTL<br><small>Auto-expire</small></div>
+      <div class="flow-box">KMS<br><small>Encryption</small></div>
+    </div>
+    <div class="flow-arrow">|</div>
+    <div class="flow-row">
+      <div class="flow-box secondary">DynamoDB Streams<br><small>Change data capture</small></div>
+      <div class="flow-box secondary">Kinesis Stream<br><small>CDC destination</small></div>
+      <div class="flow-box secondary">Global Replicas<br><small>Multi-region</small></div>
+    </div>
+    <div class="flow-arrow">|</div>
+    <div class="flow-row">
+      <div class="flow-box tertiary">Auto Scaling<br><small>Read/Write capacity</small></div>
+      <div class="flow-box tertiary">PITR<br><small>Point-in-time recovery</small></div>
+      <div class="flow-box tertiary">Contributor Insights<br><small>CloudWatch analytics</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- Component Breakdown -->
+<h2>Component Breakdown</h2>
+<table>
+  <thead>
+    <tr><th>Resource</th><th>Type</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>aws_dynamodb_table.this</code></td><td>resource</td><td>Core DynamoDB table with keys, indexes, encryption, streams, replicas</td></tr>
+    <tr><td><code>aws_dynamodb_contributor_insights.this</code></td><td>resource</td><td>CloudWatch Contributor Insights for the table</td></tr>
+    <tr><td><code>aws_dynamodb_kinesis_streaming_destination.this</code></td><td>resource</td><td>Kinesis streaming destination for CDC</td></tr>
+    <tr><td><code>aws_appautoscaling_target.read</code></td><td>resource</td><td>Auto scaling target for read capacity</td></tr>
+    <tr><td><code>aws_appautoscaling_policy.read</code></td><td>resource</td><td>Target tracking policy for read capacity</td></tr>
+    <tr><td><code>aws_appautoscaling_target.write</code></td><td>resource</td><td>Auto scaling target for write capacity</td></tr>
+    <tr><td><code>aws_appautoscaling_policy.write</code></td><td>resource</td><td>Target tracking policy for write capacity</td></tr>
+    <tr><td><code>aws_dax_cluster.this</code></td><td>resource</td><td>DAX in-memory cache cluster</td></tr>
+    <tr><td><code>aws_dax_subnet_group.this</code></td><td>resource</td><td>Subnet group for DAX cluster</td></tr>
+    <tr><td><code>aws_dax_parameter_group.this</code></td><td>resource</td><td>Parameter group for DAX cluster (TTLs)</td></tr>
+    <tr><td><code>aws_iam_role.dax</code></td><td>resource</td><td>IAM role for DAX table access</td></tr>
+    <tr><td><code>aws_iam_role_policy.dax</code></td><td>resource</td><td>IAM policy granting DAX DynamoDB operations</td></tr>
+  </tbody>
+</table>
+
+<!-- Data Flow -->
+<h2>Data Flow</h2>
+<div class="data-flow-step"><div class="step-num">1</div><div>Application sends read/write requests, optionally routed through the DAX cache cluster for microsecond-latency reads.</div></div>
+<div class="data-flow-step"><div class="step-num">2</div><div>DynamoDB table processes requests using hash and optional range keys, querying via GSIs or LSIs as needed.</div></div>
+<div class="data-flow-step"><div class="step-num">3</div><div>Server-side encryption protects data at rest with AWS-managed or customer-managed KMS keys.</div></div>
+<div class="data-flow-step"><div class="step-num">4</div><div>DynamoDB Streams capture item-level changes (NEW_AND_OLD_IMAGES) for event-driven processing.</div></div>
+<div class="data-flow-step"><div class="step-num">5</div><div>Kinesis streaming destination forwards change data to Kinesis Data Streams for real-time analytics.</div></div>
+<div class="data-flow-step"><div class="step-num">6</div><div>Global table replicas synchronize writes across regions for low-latency multi-region access.</div></div>
+<div class="data-flow-step"><div class="step-num">7</div><div>Auto scaling adjusts read/write capacity based on utilization targets (default 70%), preventing throttling.</div></div>
+
+<!-- Security Controls -->
+<h2>Security Controls</h2>
+<div class="security-item">
+  <h4>Server-Side Encryption</h4>
+  <p>Encryption at rest enabled by default (<code>enable_encryption = true</code>) with optional customer-managed KMS key via <code>kms_key_arn</code>.</p>
+</div>
+<div class="security-item">
+  <h4>Point-in-Time Recovery (PITR)</h4>
+  <p>Continuous backups enabled by default (<code>enable_point_in_time_recovery = true</code>) for up to 35 days of recovery.</p>
+</div>
+<div class="security-item">
+  <h4>DAX IAM Least Privilege</h4>
+  <p>DAX cluster IAM role is scoped to only the specific table ARN and its indexes, preventing cross-table access.</p>
+</div>
+<div class="security-item">
+  <h4>DAX Server-Side Encryption</h4>
+  <p>DAX cluster has server-side encryption enabled by default for cache data protection.</p>
+</div>
+
+<!-- Industry Adaptation -->
+<h2>Industry Adaptation</h2>
+<div class="industry-grid">
+  <div class="industry-card">
+    <h4><span class="tag tag-healthcare">Healthcare</span></h4>
+    <p>PITR and KMS encryption for PHI compliance. TTL for automatic expiration of temporary session data. Global tables for multi-region disaster recovery.</p>
+  </div>
+  <div class="industry-card">
+    <h4><span class="tag tag-finance">Finance</span></h4>
+    <p>DynamoDB Streams for real-time transaction event processing. DAX caching for high-frequency trading lookups. Auto scaling for market-hours traffic spikes.</p>
+  </div>
+  <div class="industry-card">
+    <h4><span class="tag tag-government">Government</span></h4>
+    <p>CMK encryption for data sovereignty. PITR for audit trail preservation. Contributor Insights for access pattern monitoring and compliance reporting.</p>
+  </div>
+  <div class="industry-card">
+    <h4><span class="tag tag-retail">Retail</span></h4>
+    <p>On-demand billing for seasonal traffic. DAX for sub-millisecond product catalog reads. GSIs for flexible querying by category, price, or availability.</p>
+  </div>
+  <div class="industry-card">
+    <h4><span class="tag tag-saas">SaaS</span></h4>
+    <p>Multi-tenant table design with partition key isolation. TTL for tenant data lifecycle management. Kinesis streaming for real-time usage analytics.</p>
+  </div>
+</div>
+
+<!-- Production Readiness Checklist -->
+<h2>Production Readiness Checklist</h2>
+<ul class="checklist">
+  <li>Enable Point-in-Time Recovery for all production tables</li>
+  <li>Use customer-managed KMS keys for sensitive data encryption</li>
+  <li>Configure auto scaling for provisioned-mode tables to handle traffic spikes</li>
+  <li>Enable Contributor Insights to identify hot keys and throttling patterns</li>
+  <li>Set up DynamoDB Streams or Kinesis for change data capture pipelines</li>
+  <li>Configure global table replicas for multi-region availability requirements</li>
+  <li>Enable DAX for read-heavy workloads requiring microsecond latency</li>
+  <li>Set appropriate TTL attributes for data that should auto-expire</li>
+  <li>Design GSI/LSI access patterns before table creation (LSIs are immutable)</li>
+  <li>Apply consistent tagging for cost allocation across billing modes</li>
+</ul>
+
+<!-- Configuration Reference -->
+<h2>Configuration Reference</h2>
+<table>
+  <thead>
+    <tr><th>Variable</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>table_name</code></td><td>string</td><td>required</td><td>Name of the DynamoDB table</td></tr>
+    <tr><td><code>billing_mode</code></td><td>string</td><td><code>"PAY_PER_REQUEST"</code></td><td>PROVISIONED or PAY_PER_REQUEST</td></tr>
+    <tr><td><code>hash_key</code></td><td>string</td><td>required</td><td>Hash (partition) key attribute</td></tr>
+    <tr><td><code>range_key</code></td><td>string</td><td><code>null</code></td><td>Range (sort) key attribute</td></tr>
+    <tr><td><code>attributes</code></td><td>list(object)</td><td>required</td><td>List of attribute definitions</td></tr>
+    <tr><td><code>table_class</code></td><td>string</td><td><code>"STANDARD"</code></td><td>STANDARD or STANDARD_INFREQUENT_ACCESS</td></tr>
+    <tr><td><code>enable_point_in_time_recovery</code></td><td>bool</td><td><code>true</code></td><td>Enable PITR continuous backups</td></tr>
+    <tr><td><code>enable_encryption</code></td><td>bool</td><td><code>true</code></td><td>Enable server-side encryption</td></tr>
+    <tr><td><code>kms_key_arn</code></td><td>string</td><td><code>null</code></td><td>KMS key ARN for CMK encryption</td></tr>
+    <tr><td><code>enable_ttl</code></td><td>bool</td><td><code>false</code></td><td>Enable TTL on the table</td></tr>
+    <tr><td><code>enable_stream</code></td><td>bool</td><td><code>false</code></td><td>Enable DynamoDB Streams</td></tr>
+    <tr><td><code>enable_global_tables</code></td><td>bool</td><td><code>false</code></td><td>Enable multi-region replication</td></tr>
+    <tr><td><code>enable_autoscaling</code></td><td>bool</td><td><code>false</code></td><td>Enable auto scaling</td></tr>
+    <tr><td><code>enable_dax</code></td><td>bool</td><td><code>false</code></td><td>Create a DAX cache cluster</td></tr>
+    <tr><td><code>enable_kinesis_streaming</code></td><td>bool</td><td><code>false</code></td><td>Enable Kinesis streaming</td></tr>
+    <tr><td><code>enable_contributor_insights</code></td><td>bool</td><td><code>true</code></td><td>Enable Contributor Insights</td></tr>
+    <tr><td><code>tags</code></td><td>map(string)</td><td><code>{}</code></td><td>Tags for all resources</td></tr>
+  </tbody>
+</table>
+
+<!-- Deployment -->
+<h2>Deployment</h2>
+<pre>
+# Clone the repository
+git clone https://github.com/kogunlowo123/terraform-aws-dynamodb.git
+cd terraform-aws-dynamodb
+
+# Initialize Terraform
+terraform init
+
+# Review the execution plan
+terraform plan
+
+# Apply the configuration
+terraform apply
+
+# To destroy all resources
+terraform destroy
+</pre>
+
+<!-- Links -->
+<h2>Links</h2>
+<div class="links-section">
+  <p><a href="https://github.com/kogunlowo123/terraform-aws-dynamodb">GitHub Repository</a></p>
+  <p><a href="https://github.com/kogunlowo123/terraform-aws-dynamodb/blob/main/README.md">README.md</a></p>
+  <p><a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/">AWS DynamoDB Documentation</a></p>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>Generated on 2026-03-15 &mdash; terraform-aws-dynamodb Architecture Document</p>
+  <p>Terraform >= 1.5.0 &bull; AWS Provider >= 5.20.0</p>
+</footer>
+
+</body>
+</html>

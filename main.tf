@@ -9,8 +9,8 @@ resource "aws_dynamodb_table" "this" {
   range_key    = var.range_key
   table_class  = var.table_class
 
-  read_capacity  = local.is_provisioned ? var.read_capacity : null
-  write_capacity = local.is_provisioned ? var.write_capacity : null
+  read_capacity  = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
+  write_capacity = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
 
   stream_enabled   = var.enable_stream || var.enable_global_tables ? true : false
   stream_view_type = var.enable_stream || var.enable_global_tables ? var.stream_view_type : null
@@ -31,8 +31,8 @@ resource "aws_dynamodb_table" "this" {
       range_key          = lookup(global_secondary_index.value, "range_key", null)
       projection_type    = global_secondary_index.value.projection_type
       non_key_attributes = global_secondary_index.value.projection_type != "ALL" ? lookup(global_secondary_index.value, "non_key_attributes", null) : null
-      read_capacity      = local.is_provisioned ? lookup(global_secondary_index.value, "read_capacity", var.read_capacity) : null
-      write_capacity     = local.is_provisioned ? lookup(global_secondary_index.value, "write_capacity", var.write_capacity) : null
+      read_capacity      = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "read_capacity", var.read_capacity) : null
+      write_capacity     = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "write_capacity", var.write_capacity) : null
     }
   }
 
@@ -73,7 +73,7 @@ resource "aws_dynamodb_table" "this" {
     }
   }
 
-  tags = local.tags
+  tags = var.tags
 
   lifecycle {
     ignore_changes = [
@@ -109,11 +109,11 @@ resource "aws_dynamodb_contributor_insights" "this" {
 ################################################################################
 
 resource "aws_appautoscaling_target" "read" {
-  count = local.autoscaling_enabled ? 1 : 0
+  count = var.enable_autoscaling && var.billing_mode == "PROVISIONED" ? 1 : 0
 
   max_capacity       = var.autoscaling_read_max_capacity
   min_capacity       = var.autoscaling_read_min_capacity
-  resource_id        = local.table_arn_prefix
+  resource_id        = "table/${var.table_name}"
   scalable_dimension = "dynamodb:table:ReadCapacityUnits"
   service_namespace  = "dynamodb"
 
@@ -121,7 +121,7 @@ resource "aws_appautoscaling_target" "read" {
 }
 
 resource "aws_appautoscaling_policy" "read" {
-  count = local.autoscaling_enabled ? 1 : 0
+  count = var.enable_autoscaling && var.billing_mode == "PROVISIONED" ? 1 : 0
 
   name               = "DynamoDBReadCapacityUtilization:${aws_appautoscaling_target.read[0].resource_id}"
   policy_type        = "TargetTrackingScaling"
@@ -142,11 +142,11 @@ resource "aws_appautoscaling_policy" "read" {
 ################################################################################
 
 resource "aws_appautoscaling_target" "write" {
-  count = local.autoscaling_enabled ? 1 : 0
+  count = var.enable_autoscaling && var.billing_mode == "PROVISIONED" ? 1 : 0
 
   max_capacity       = var.autoscaling_write_max_capacity
   min_capacity       = var.autoscaling_write_min_capacity
-  resource_id        = local.table_arn_prefix
+  resource_id        = "table/${var.table_name}"
   scalable_dimension = "dynamodb:table:WriteCapacityUnits"
   service_namespace  = "dynamodb"
 
@@ -154,7 +154,7 @@ resource "aws_appautoscaling_target" "write" {
 }
 
 resource "aws_appautoscaling_policy" "write" {
-  count = local.autoscaling_enabled ? 1 : 0
+  count = var.enable_autoscaling && var.billing_mode == "PROVISIONED" ? 1 : 0
 
   name               = "DynamoDBWriteCapacityUtilization:${aws_appautoscaling_target.write[0].resource_id}"
   policy_type        = "TargetTrackingScaling"

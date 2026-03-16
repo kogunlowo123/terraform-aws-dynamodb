@@ -10,14 +10,14 @@ resource "aws_dax_cluster" "this" {
   node_type          = var.dax_node_type
   replication_factor = var.dax_node_count
 
-  subnet_group_name  = aws_dax_subnet_group.this[0].name
+  subnet_group_name    = aws_dax_subnet_group.this[0].name
   parameter_group_name = aws_dax_parameter_group.this[0].name
 
   server_side_encryption {
     enabled = true
   }
 
-  tags = local.tags
+  tags = var.tags
 }
 
 ################################################################################
@@ -73,7 +73,7 @@ resource "aws_iam_role" "dax" {
     ]
   })
 
-  tags = local.tags
+  tags = var.tags
 }
 
 resource "aws_iam_role_policy" "dax" {
